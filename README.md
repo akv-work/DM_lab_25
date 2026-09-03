@@ -19,4 +19,5 @@
 **Журналы:**
 
 1 подгруппа: https://docs.google.com/spreadsheets/d/1j2iWW3oECcqtLcA1Jnqf4V1X5UN2dEuDlA6-9ceQ5-0/edit?usp=sharing
+
 2 подгруппа: https://docs.google.com/spreadsheets/d/1xJs6xhbv-vLkjREFyCO4FptWdoMOV4PBh7WX5hsA92A/edit?usp=sharing
