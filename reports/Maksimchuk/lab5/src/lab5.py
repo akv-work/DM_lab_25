@@ -13,9 +13,7 @@ from catboost import CatBoostClassifier
 import warnings
 warnings.filterwarnings('ignore')
 
-# ============================================================
-# 1. ЗАГРУЗКА ДАТАСЕТА
-# ============================================================
+
 mushroom = fetch_ucirepo(id=73)
 
 X = mushroom.data.features
@@ -24,16 +22,14 @@ y = mushroom.data.targets
 print(mushroom.metadata)
 print(mushroom.variables)
 
-# Целевая переменная: p (ядовитый) -> 1, e (съедобный) -> 0
+
 y = y.iloc[:, 0].map({'p': 1, 'e': 0})
 
 print("\nДанные:", X.shape)
 print("Ядовитые:", (y == 1).sum(), f"({(y == 1).mean()*100:.1f}%)")
 print("Съедобные:", (y == 0).sum())
 
-# ============================================================
-# 2. РАЗБИЕНИЕ И ONE-HOT ENCODING
-# ============================================================
+
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
@@ -50,9 +46,7 @@ X_test_enc = preprocessor.transform(X_test)
 print(f"\nОбучающая: {X_train_enc.shape}, тестовая: {X_test_enc.shape}")
 print(f"Ядовитых в тесте: {y_test.sum()}, съедобных: {(y_test == 0).sum()}")
 
-# ============================================================
-# 3. МОДЕЛИ
-# ============================================================
+
 models = {
     'Decision Tree': DecisionTreeClassifier(max_depth=10, random_state=42),
     'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
@@ -69,9 +63,7 @@ models = {
     ),
 }
 
-# ============================================================
-# 4. ОБУЧЕНИЕ И ОЦЕНКА
-# ============================================================
+
 results = []
 preds = {}
 
