@@ -1,0 +1,5 @@
+Модель,Accuracy,F1 (macro),F1 (weighted)
+DecisionTree,0.6977,0.691,0.693
+RandomForest,0.8372,0.8374,0.8355
+AdaBoost,0.3953,0.3587,0.3638
+GradientBoosting,0.8372,0.8294,0.8355
