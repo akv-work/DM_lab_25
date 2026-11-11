@@ -1,0 +1,174 @@
+import numpy as np
+import pandas as pd
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D          
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+plt.rcParams['figure.dpi'] = 110
+plt.rcParams['axes.grid'] = True
+plt.rcParams['grid.alpha'] = 0.3
+np.random.seed(42)
+
+
+DATA_PATH = 'seeds_dataset.txt'
+
+df = pd.read_csv(DATA_PATH, sep=r'\s+', header=None, engine='python')
+df = df.dropna(axis=1, how='all').dropna(how='all')   
+
+n_feat = df.shape[1] - 1
+df.columns = [f'X{i+1}' for i in range(n_feat)] + ['target']
+
+X = df.drop(columns='target').astype(float)
+y = df['target'].astype(int)
+
+
+if X.isna().any().any():
+    print('Найдены пропуски -> заменяем средними значениями по столбцу')
+    X = X.fillna(X.mean())
+
+print(f'Размер выборки: {X.shape[0]} объектов, {X.shape[1]} признаков')
+print('Распределение классов:', dict(y.value_counts().sort_index()))
+
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X.values)
+
+
+def pca_manual(Xs, n_components):
+    """Возвращает проекцию, матрицу компонент, собственные значения, среднее."""
+    mean_ = Xs.mean(axis=0)
+    Xc = Xs - mean_
+    cov = np.cov(Xc, rowvar=False, ddof=1)
+
+    eigvals, eigvecs = np.linalg.eig(cov)
+    eigvals, eigvecs = np.real(eigvals), np.real(eigvecs)   
+
+    order = np.argsort(eigvals)[::-1]                       
+    eigvals = eigvals[order]
+    eigvecs = eigvecs[:, order]
+
+    
+    idx = np.argmax(np.abs(eigvecs), axis=0)
+    signs = np.sign(eigvecs[idx, range(eigvecs.shape[1])])
+    eigvecs *= signs
+
+    comps = eigvecs[:, :n_components]
+    Z = Xc @ comps
+    return Z, comps, eigvals, mean_
+
+
+Z2_man, W2_man, eigvals, mean_ = pca_manual(X_scaled, 2)
+Z3_man, W3_man, _,          _     = pca_manual(X_scaled, 3)
+
+explained_man = eigvals / eigvals.sum()
+cum_man = np.cumsum(explained_man)
+
+print('\n PCA вручную (numpy.linalg.eig) ')
+print('Собственные значения:', np.round(eigvals, 5))
+print('Доля объяснённой дисперсии:', np.round(explained_man, 5))
+print('Накопленная доля:', np.round(cum_man, 5))
+
+
+pca2 = PCA(n_components=2).fit(X_scaled)
+pca3 = PCA(n_components=3).fit(X_scaled)
+
+Z2_sk = pca2.transform(X_scaled)
+Z3_sk = pca3.transform(X_scaled)
+
+print('\n--- PCA (sklearn.decomposition.PCA) ---')
+print('explained_variance_:      ', np.round(pca2.explained_variance_ if False else PCA().fit(X_scaled).explained_variance_, 5))
+print('explained_variance_ratio_:', np.round(PCA().fit(X_scaled).explained_variance_ratio_, 5))
+print('Накопленная доля:', np.round(np.cumsum(PCA().fit(X_scaled).explained_variance_ratio_), 5))
+
+
+same2 = np.allclose(np.abs(Z2_man), np.abs(Z2_sk), atol=1e-8)
+same3 = np.allclose(np.abs(Z3_man), np.abs(Z3_sk), atol=1e-8)
+print(f'\nРезультаты совпадают (2 компоненты): {same2}')
+print(f'Результаты совпадают (3 компоненты): {same3}')
+
+classes = np.unique(y)
+colors = plt.cm.tab10(np.linspace(0, 1, len(classes)))
+markers = ['o', 's', '^', 'D', 'v', 'P', 'X']
+
+def scatter2d(ax, Z, title, evr=None):
+    for i, c in enumerate(classes):
+        m = y.values == c
+        ax.scatter(Z[m, 0], Z[m, 1], s=40, marker=markers[i % len(markers)],
+                   color=colors[i], edgecolor='k', linewidth=0.4,
+                   alpha=0.85, label=f'класс {c}')
+    ax.set_xlabel(f'PC1' + (f' ({evr[0]*100:.1f}%)' if evr is not None else ''))
+    ax.set_ylabel(f'PC2' + (f' ({evr[1]*100:.1f}%)' if evr is not None else ''))
+    ax.set_title(title)
+    ax.legend(fontsize=8)
+
+def scatter3d(ax, Z, title):
+    for i, c in enumerate(classes):
+        m = y.values == c
+        ax.scatter(Z[m, 0], Z[m, 1], Z[m, 2], s=35, marker=markers[i % len(markers)],
+                   color=colors[i], edgecolor='k', linewidth=0.3,
+                   alpha=0.85, label=f'класс {c}')
+    ax.set_xlabel('PC1'); ax.set_ylabel('PC2'); ax.set_zlabel('PC3')
+    ax.set_title(title)
+    ax.legend(fontsize=8)
+
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
+scatter2d(axes[0], Z2_man, 'PCA вручную (eig), 2 компоненты', explained_man)
+scatter2d(axes[1], Z2_sk, 'PCA sklearn, 2 компоненты',
+          pca2.explained_variance_ratio_)
+plt.tight_layout()
+plt.savefig('pca_2d.png', bbox_inches='tight')
+plt.show()
+
+fig = plt.figure(figsize=(14, 6))
+ax1 = fig.add_subplot(121, projection='3d')
+scatter3d(ax1, Z3_man, 'PCA вручную (eig), 3 компоненты')
+ax2 = fig.add_subplot(122, projection='3d')
+scatter3d(ax2, Z3_sk, 'PCA sklearn, 3 компоненты')
+plt.tight_layout()
+plt.savefig('pca_3d.png', bbox_inches='tight')
+plt.show()
+
+
+fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.5))
+a1.bar(range(1, len(eigvals)+1), explained_man, color='steelblue', edgecolor='k')
+a1.set_xlabel('Номер главной компоненты'); a1.set_ylabel('Доля дисперсии')
+a1.set_title('Собственные значения (доля дисперсии)')
+
+a2.plot(range(1, len(eigvals)+1), cum_man, 'o-', color='darkred')
+a2.axhline(0.95, ls='--', color='gray')
+a2.set_xlabel('Число компонент'); a2.set_ylabel('Накопленная доля дисперсии')
+a2.set_title('Накопленная объяснённая дисперсия')
+a2.set_xticks(range(1, len(eigvals)+1)); a2.set_ylim(0, 1.02)
+plt.tight_layout()
+plt.savefig('pca_scree.png', bbox_inches='tight')
+plt.show()
+
+total_var = eigvals.sum()
+
+print('\n ПОТЕРИ ПРИ СЖАТИИ РАЗМЕРНОСТИ ')
+print(f'{"k":>2} | {"сумма λ (k)":>13} | {"объяснено, %":>13} | {"потеряно, %":>11} | {"MSE восст.":>11}')
+print('-' * 66)
+
+rows = []
+for k in range(1, len(eigvals) + 1):
+    Zk, Wk, _, mu = pca_manual(X_scaled, k)
+    X_rec = Zk @ Wk.T + mu                   
+    mse = np.mean((X_scaled - X_rec) ** 2)
+
+    var_k = eigvals[:k].sum()
+    expl = var_k / total_var
+    loss = 1 - expl
+    rows.append((k, var_k, expl, loss, mse))
+    print(f'{k:>2} | {var_k:>13.4f} | {expl*100:>12.2f}% | {loss*100:>10.2f}% | {mse:>11.5f}')
+
+loss_df = pd.DataFrame(rows, columns=['k', 'sum_lambda', 'explained', 'lost', 'mse'])
+loss_df.to_csv('pca_losses.csv', index=False)
+
+k95 = int(np.searchsorted(cum_man, 0.95) + 1)
+print(f'\nДля сохранения 95% дисперсии достаточно {k95} компонент(ы) '
+      f'из {len(eigvals)}.')
+print(f'При переходе к 2 компонентам теряется {loss_df.loc[1,"lost"]*100:.2f}% дисперсии.')
+print(f'При переходе к 3 компонентам теряется {loss_df.loc[2,"lost"]*100:.2f}% дисперсии.')
